@@ -35,6 +35,8 @@ class Attachment extends IdModel<
   InferAttributes<Attachment>,
   Partial<InferCreationAttributes<Attachment>>
 > {
+  static eventData = ["name"];
+
   @Length({
     max: 4096,
     msg: "key must be 4096 characters or less",

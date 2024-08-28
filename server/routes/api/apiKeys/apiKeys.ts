@@ -3,7 +3,7 @@ import { UserRole } from "@shared/types";
 import auth from "@server/middlewares/authentication";
 import { transaction } from "@server/middlewares/transaction";
 import validate from "@server/middlewares/validate";
-import { ApiKey, Event } from "@server/models";
+import { ApiKey } from "@server/models";
 import { authorize } from "@server/policies";
 import { presentApiKey } from "@server/presenters";
 import { APIContext, AuthenticationType } from "@server/types";
@@ -20,32 +20,16 @@ router.post(
   async (ctx: APIContext<T.APIKeysCreateReq>) => {
     const { name, expiresAt } = ctx.input.body;
     const { user } = ctx.state.auth;
-    const { transaction } = ctx.state;
 
     authorize(user, "createApiKey", user.team);
-    const key = await ApiKey.create(
-      {
-        name,
-        userId: user.id,
-        expiresAt,
-      },
-      { transaction }
-    );
-
-    await Event.createFromContext(
-      ctx,
-      {
-        name: "api_keys.create",
-        modelId: key.id,
-        data: {
-          name,
-        },
-      },
-      { transaction }
-    );
+    const apiKey = await ApiKey.createWithCtx(ctx, {
+      name,
+      userId: user.id,
+      expiresAt,
+    });
 
     ctx.body = {
-      data: presentApiKey(key),
+      data: presentApiKey(apiKey),
     };
   }
 );
@@ -56,18 +40,20 @@ router.post(
   pagination(),
   async (ctx: APIContext) => {
     const { user } = ctx.state.auth;
-    const keys = await ApiKey.findAll({
+    const { pagination } = ctx.state;
+
+    const apiKeys = await ApiKey.findAll({
       where: {
         userId: user.id,
       },
       order: [["createdAt", "DESC"]],
-      offset: ctx.state.pagination.offset,
-      limit: ctx.state.pagination.limit,
+      offset: pagination.offset,
+      limit: pagination.limit,
     });
 
     ctx.body = {
-      pagination: ctx.state.pagination,
-      data: keys.map(presentApiKey),
+      pagination,
+      data: apiKeys.map(presentApiKey),
     };
   }
 );
@@ -88,18 +74,7 @@ router.post(
     });
     authorize(user, "delete", key);
 
-    await key.destroy({ transaction });
-    await Event.createFromContext(
-      ctx,
-      {
-        name: "api_keys.delete",
-        modelId: key.id,
-        data: {
-          name: key.name,
-        },
-      },
-      { transaction }
-    );
+    await key.destroyWithCtx(ctx);
 
     ctx.body = {
       success: true,

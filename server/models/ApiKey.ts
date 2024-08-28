@@ -24,6 +24,10 @@ class ApiKey extends ParanoidModel<
 > {
   static prefix = "ol_api_";
 
+  static eventNamespace = "api_keys";
+
+  static eventData = ["name"];
+
   @Length({
     min: ApiKeyValidation.minNameLength,
     max: ApiKeyValidation.maxNameLength,

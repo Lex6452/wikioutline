@@ -1,6 +1,5 @@
 import escapeRegExp from "lodash/escapeRegExp";
 import startCase from "lodash/startCase";
-import { Transaction } from "sequelize";
 import { AttachmentPreset } from "@shared/types";
 import {
   getCurrentDateAsString,
@@ -13,6 +12,7 @@ import env from "@server/env";
 import { trace } from "@server/logging/tracing";
 import { Attachment, User } from "@server/models";
 import FileStorage from "@server/storage/files";
+import { APIContext } from "@server/types";
 import parseAttachmentIds from "@server/utils/parseAttachmentIds";
 import parseImages from "@server/utils/parseImages";
 
@@ -91,8 +91,7 @@ export class TextHelper {
   static async replaceImagesWithAttachments(
     markdown: string,
     user: User,
-    ip?: string,
-    transaction?: Transaction
+    ctx: APIContext
   ) {
     let output = markdown;
     const images = parseImages(markdown);
@@ -114,11 +113,10 @@ export class TextHelper {
           url: image.src,
           preset: AttachmentPreset.DocumentAttachment,
           user,
-          ip,
-          transaction,
           fetchOptions: {
             timeout: timeoutPerImage,
           },
+          ctx,
         });
 
         if (attachment) {

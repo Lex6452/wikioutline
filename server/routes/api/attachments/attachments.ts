@@ -64,31 +64,17 @@ router.post(
       userId: user.id,
     });
 
-    const attachment = await Attachment.create(
-      {
-        id: modelId,
-        key,
-        acl,
-        size,
-        expiresAt: AttachmentHelper.presetToExpiry(preset),
-        contentType,
-        documentId,
-        teamId: user.teamId,
-        userId: user.id,
-      },
-      { transaction }
-    );
-    await Event.createFromContext(
-      ctx,
-      {
-        name: "attachments.create",
-        data: {
-          name,
-        },
-        modelId,
-      },
-      { transaction }
-    );
+    const attachment = await Attachment.createWithCtx(ctx, {
+      id: modelId,
+      key,
+      acl,
+      size,
+      expiresAt: AttachmentHelper.presetToExpiry(preset),
+      contentType,
+      documentId,
+      teamId: user.teamId,
+      userId: user.id,
+    });
 
     const presignedPost = await FileStorage.getPresignedPost(
       key,

@@ -1118,10 +1118,9 @@ router.post(
       document,
       title,
       publish,
-      transaction,
       recursive,
       parentDocumentId,
-      ip: ctx.request.ip,
+      ctx,
     });
 
     ctx.body = {
@@ -1375,7 +1374,6 @@ router.post(
       collectionId,
       parentDocumentId,
       publish,
-      ip: ctx.request.ip,
     });
     const response: DocumentImportTaskResponse = await job.finished();
     if ("error" in response) {
@@ -1470,12 +1468,7 @@ router.post(
 
     const document = await documentCreator({
       title,
-      text: await TextHelper.replaceImagesWithAttachments(
-        text,
-        user,
-        ctx.request.ip,
-        transaction
-      ),
+      text: await TextHelper.replaceImagesWithAttachments(text, user, ctx),
       icon,
       color,
       createdAt,
@@ -1487,8 +1480,7 @@ router.post(
       fullWidth,
       user,
       editorVersion,
-      ip: ctx.request.ip,
-      transaction,
+      ctx,
     });
 
     document.collection = collection;
