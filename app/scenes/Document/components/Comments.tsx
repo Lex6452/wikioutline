@@ -33,6 +33,12 @@ function Comments() {
   const focusedComment = useFocusedComment();
   const can = usePolicy(document);
 
+  const readyToDisplay = Boolean(document && isEditorInitialized);
+  const scrollableRef = React.useRef<HTMLDivElement | null>(null);
+  const prevThreadCount = React.useRef(0);
+  const isAtBottom = React.useRef(true);
+  const [showJumpToRecentBtn, setShowJumpToRecentBtn] = React.useState(false);
+
   useKeyDown("Escape", () => document && ui.collapseComments(document?.id));
 
   const [draft, onSaveDraft] = usePersistedState<ProsemirrorData | undefined>(
@@ -50,18 +56,61 @@ function Comments() {
     : { type: CommentSortType.MostRecent };
 
   const viewingResolved = params.get("resolved") === "";
-  const resolvedThreads = document
+  const threads = !document
+    ? []
+    : viewingResolved
     ? comments.resolvedThreadsInDocument(document.id, sortOption)
-    : [];
-
-  if (!document || !isEditorInitialized) {
-    return null;
-  }
-
-  const threads = viewingResolved
-    ? resolvedThreads
     : comments.unresolvedThreadsInDocument(document.id, sortOption);
   const hasComments = threads.length > 0;
+
+  const scrollToBottom = () => {
+    if (scrollableRef.current) {
+      scrollableRef.current.scrollTo({
+        top: scrollableRef.current.scrollHeight,
+      });
+    }
+  };
+
+  const handleScroll = () => {
+    const BUFFER_PX = 50;
+
+    if (scrollableRef.current) {
+      const sh = scrollableRef.current.scrollHeight;
+      const st = scrollableRef.current.scrollTop;
+      const ch = scrollableRef.current.clientHeight;
+      isAtBottom.current = Math.abs(sh - (st + ch)) <= BUFFER_PX;
+
+      if (isAtBottom.current) {
+        setShowJumpToRecentBtn(false);
+      }
+    }
+  };
+
+  React.useEffect(() => {
+    // Handles: 1. on refresh 2. when switching sort setting
+    if (readyToDisplay && sortOption.type === CommentSortType.MostRecent) {
+      scrollToBottom();
+    }
+  }, [sortOption.type, readyToDisplay]);
+
+  React.useEffect(() => {
+    setShowJumpToRecentBtn(false);
+    if (sortOption.type === CommentSortType.MostRecent) {
+      const commentsAdded = threads.length > prevThreadCount.current;
+      if (commentsAdded) {
+        if (isAtBottom.current) {
+          scrollToBottom(); // Remain pinned to bottom on new comments
+        } else {
+          setShowJumpToRecentBtn(true);
+        }
+      }
+    }
+    prevThreadCount.current = threads.length;
+  }, [threads.length]);
+
+  if (!readyToDisplay) {
+    return null;
+  }
 
   return (
     <Sidebar
@@ -71,7 +120,7 @@ function Comments() {
           <CommentSortMenu />
         </Flex>
       }
-      onClose={() => ui.collapseComments(document?.id)}
+      onClose={() => ui.collapseComments(document!.id)}
       scrollable={false}
     >
       <Scrollable
@@ -79,6 +128,8 @@ function Comments() {
         bottomShadow={!focusedComment}
         hiddenScrollbars
         topShadow
+        ref={scrollableRef}
+        onScroll={handleScroll}
       >
         <Wrapper $hasComments={hasComments}>
           {hasComments ? (
@@ -86,7 +137,7 @@ function Comments() {
               <CommentThread
                 key={thread.id}
                 comment={thread}
-                document={document}
+                document={document!}
                 recessed={!!focusedComment && focusedComment.id !== thread.id}
                 focused={focusedComment?.id === thread.id}
               />
@@ -100,6 +151,9 @@ function Comments() {
               </PositionedEmpty>
             </NoComments>
           )}
+          {showJumpToRecentBtn && (
+            <ScrollToRecent onClick={scrollToBottom}>↓</ScrollToRecent>
+          )}
         </Wrapper>
       </Scrollable>
       <AnimatePresence initial={false}>
@@ -107,10 +161,10 @@ function Comments() {
           <NewCommentForm
             draft={draft}
             onSaveDraft={onSaveDraft}
-            documentId={document.id}
+            documentId={document!.id}
             placeholder={`${t("Add a comment")}…`}
             autoFocus={false}
-            dir={document.dir}
+            dir={document!.dir}
             animatePresence
             standalone
           />
@@ -132,8 +186,30 @@ const NoComments = styled(Flex)`
 `;
 
 const Wrapper = styled.div<{ $hasComments: boolean }>`
-  padding-bottom: ${(props) => (props.$hasComments ? "50vh" : "0")};
   height: ${(props) => (props.$hasComments ? "auto" : "100%")};
+`;
+
+const ScrollToRecentSize = "32px";
+
+const ScrollToRecent = styled.div`
+  position: sticky;
+  bottom: 12px;
+  margin-top: -${ScrollToRecentSize};
+  width: ${ScrollToRecentSize};
+  height: ${ScrollToRecentSize};
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${(props) => props.theme.accent};
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0.7;
+
+  &:hover {
+    opacity: 1;
+  }
 `;
 
 const NewCommentForm = styled(CommentForm)<{ dir?: "ltr" | "rtl" }>`
